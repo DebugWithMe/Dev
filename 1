@@ -1,1 +1,182 @@
-              
+              @jazz-gui-acceptance-test @actuator-monitor @e2e
+Feature: Actuator Monitor UI and Functionality
+  As a user, I want to monitor application health, info, environment variables, and cache details
+  across different deployment environments so that I can ensure applications are running correctly and diagnose issues.
+
+  Background:
+    Given the Actuator Monitor page is loaded
+
+  @ci @initial-load @overview-display
+  Scenario: Initial display and default environment data
+    Then the "dev" environment tab should be active
+    And the "overview" view tab should be active
+    And a loading indicator for "dev" should initially be visible
+    When data for "dev" environment with health status "UP", app name "agent-interface-service-runtime", and git commit "ac277ca" is successfully loaded for overview
+    Then the loading indicator should not be visible
+    And the "overview" display for "dev" should show health status "UP"
+    And the "overview" display for "dev" should show application name "agent-interface-service-runtime"
+    And the "overview" display for "dev" should show git commit "ac277ca"
+
+  @ci @environment-switching @overview-display
+  Scenario Outline: Switching environments and displaying overview data
+    Given the "<initial_env>" environment tab is active
+    And overview data for the "<initial_env>" environment is displayed
+    When the user clicks the "<target_env>" environment tab
+    Then a loading indicator for "<target_env>" should be visible
+    When data for "<target_env>" environment with health status "<health_status>", app name "<app_name>", and git commit "<git_commit>" is successfully loaded for overview
+    Then the loading indicator should not be visible
+    And the "<target_env>" environment tab should be active
+    And the "<initial_env>" environment tab should not be active
+    And the "overview" view tab should remain active
+    And the "overview" display for "<target_env>" should show health status "<health_status>"
+    And the "overview" display for "<target_env>" should show application name "<app_name>"
+    And the "overview" display for "<target_env>" should show git commit "<git_commit>"
+
+    Examples:
+      | initial_env | target_env | health_status    | app_name           | git_commit |
+      | dev         | e2e        | "DOWN"           | "E2E-TestApp"      | "b34f001"  |
+      | e2e         | produsc    | "UP"             | "ProdUSC-App"      | "c123abc"  |
+      | produsc     | ppr        | "OUT_OF_SERVICE" | "PPR-ValidationApp"| "d456def"  |
+
+  @ci @view-switching @env-display @curated-env
+  Scenario: Switching to 'env' view and seeing curated environment properties
+    Given the "dev" environment tab is active and its overview data is loaded
+    And the "dev" environment has specific 'env' data including "java.specification.version" as "21" and "activeProfiles" as "dev"
+    When the user clicks the "env" view tab
+    Then the "env" view tab should be active
+    And the "overview" view tab should not be active
+    And the 'env' view for "dev" should display the curated property "java.specification.version" with value "21"
+    And the 'env' view for "dev" should display the curated property "activeProfiles" containing "dev"
+    And no new full data fetch for the "dev" environment is triggered
+
+  @ci @view-switching @env-display @env-raw-json
+  Scenario: Switching to 'env' view and toggling to raw JSON
+    Given the "dev" environment tab is active and its 'env' data is loaded with "java.specification.version" as "21"
+    And the "env" view tab is active displaying curated properties
+    When the user toggles the 'env' view to show raw JSON
+    Then the 'env' view for "dev" should display raw JSON containing "java.specification.version"
+    And the 'env' view for "dev" should display raw JSON containing "activeProfiles"
+    And the 'env' view for "dev" should show the "Hide Raw JSON" button or "Show Curated Properties" button
+
+  @ci @view-switching @env-display @env-search
+  Scenario: Searching within 'env' view curated properties
+    Given the "dev" environment tab is active and its 'env' data is loaded including "java.specification.version" as "21" and "user.timezone" as "GMT"
+    And the "env" view tab is active displaying curated properties
+    When the user searches for "java" in the 'env' view
+    Then the 'env' view for "dev" should display the curated property "java.specification.version"
+    And the 'env' view for "dev" should not display the curated property "user.timezone"
+    When the user clears the search in the 'env' view
+    Then the 'env' view for "dev" should display the curated property "java.specification.version"
+    And the 'env' view for "dev" should display the curated property "user.timezone"
+
+  @ci @view-switching @caches-display
+  Scenario: Switching to 'caches' view and seeing cache details
+    Given the "dev" environment tab is active and its overview data is loaded
+    And the "dev" environment has specific 'caches' data including cache "SafeAgent" with target "com.github.benmanes.caffeine.cache.BoundedLocalCache$BoundedLocalManualCache"
+    When the user clicks the "caches" view tab
+    Then the "caches" view tab should be active
+    And the "overview" view tab should not be active
+    And the 'caches' view for "dev" should display the cache name "SafeAgent"
+    And the 'caches' view for "dev" should display details for "SafeAgent" containing "com.github.benmanes.caffeine.cache.BoundedLocalCache$BoundedLocalManualCache"
+    And no new full data fetch for the "dev" environment is triggered
+
+  @ci @refresh-data @overview-display
+  Scenario: Refreshing data for the current environment (overview)
+    Given the "prod" environment tab is active
+    And the "overview" view tab is active
+    And the "overview" display for "prod" shows health status "UP"
+    When the user clicks the "Refresh" button
+    Then a loading indicator for "prod" should be visible
+    And the "Refresh" button should be disabled
+    When data for the "prod" environment with health status "DOWN" and app name "ProductionApp" is successfully reloaded for overview
+    Then the loading indicator should not be visible
+    And the "Refresh" button should be enabled
+    And the "overview" display for "prod" should show health status "DOWN"
+    And the "overview" display for "prod" should show application name "ProductionApp"
+
+  @ci @error-handling @general-error
+  Scenario: Displaying a general error for an environment
+    Given the "ppr" environment tab is active
+    When fetching data for the "ppr" environment results in a general error "Connection refused to PPR services"
+    And the user clicks the "ppr" environment tab to trigger the fetch (if not automatic)
+    Then a general error message "Error: Connection refused to PPR services" should be displayed for "ppr"
+    And the "Retry all" button should be visible in the error message
+    And no specific data view content should be visible for "ppr"
+
+  @ci @error-handling @endpoint-error @overview-display
+  Scenario: Displaying specific endpoint errors on Overview tab (Health fails, Info succeeds)
+    Given the "e2eusc" environment tab is active
+    And the "overview" view tab is active
+    When data for "e2eusc" is loaded with a health endpoint error "Health check service unavailable" but info data is successful with app name "E2E-US-App" and git commit "e2ecommit"
+    Then the "overview" view tab should have an error indicator with title "Health check service unavailable"
+    And the "overview" display for "e2eusc" should show health error "Could not load health data: Health check service unavailable"
+    And the "overview" display for "e2eusc" should show application name "E2E-US-App"
+    And the "overview" display for "e2eusc" should show git commit "e2ecommit"
+
+  @ci @error-handling @endpoint-error @overview-display
+  Scenario: Displaying specific endpoint errors on Overview tab (Info fails, Health succeeds)
+    Given the "e2eusc" environment tab is active
+    And the "overview" view tab is active
+    When data for "e2eusc" is loaded with an info endpoint error "Info service timed out" but health data is successful with status "UP"
+    Then the "overview" view tab should have an error indicator with title "Info service timed out"
+    And the "overview" display for "e2eusc" should show info error "Could not load info data: Info service timed out"
+    And the "overview" display for "e2eusc" should show health status "UP"
+
+  @ci @error-handling @endpoint-error @env-display
+  Scenario: Displaying specific endpoint error on 'env' view tab
+    Given the "dev" environment tab is active and its overview data is loaded
+    When data for "dev" 'env' endpoint results in an error "Environment details retrieval failed"
+    And the user clicks the "env" view tab
+    Then the "env" view tab should have an error indicator with title "Environment details retrieval failed"
+    And a view-specific error message "Error loading env: Environment details retrieval failed" should be displayed
+
+  @no-data-message @overview-display
+  Scenario: Displaying "No Health or Info data" message on Overview from ActuatorMonitorComponent
+    Given the "dev" environment tab is active
+    And the "overview" view tab is active
+    When data for "dev" environment is loaded with no health and no info data available (both are null or empty from service)
+    Then the message "No Health or Info data was returned for DEV." should be displayed on the overview
+
+  @no-data-message @overview-display @health-specific
+  Scenario: Displaying "Health data not available." from OverviewDisplayComponent
+    Given the "e2e" environment tab is active
+    And the "overview" view tab is active
+    When data for "e2e" environment is loaded with null health data but valid info data with app name "E2E-TestApp"
+    Then the "overview" display for "e2e" should show message "Health data not available." in the health section
+    And the "overview" display for "e2e" should show application name "E2E-TestApp"
+
+  @no-data-message @overview-display @info-specific
+  Scenario: Displaying "Info data not available." from OverviewDisplayComponent
+    Given the "e2e" environment tab is active
+    And the "overview" view tab is active
+    When data for "e2e" environment is loaded with null info data but valid health data with status "UP"
+    Then the "overview" display for "e2e" should show message "Info data not available." in the info section
+    And the "overview" display for "e2e" should show health status "UP"
+
+  @no-data-message @overview-display @info-specific
+  Scenario: Displaying "Info endpoint returned no data." from OverviewDisplayComponent
+    Given the "e2e" environment tab is active
+    And the "overview" view tab is active
+    When data for "e2e" environment is loaded with empty info data (e.g. infoData = {}) but valid health data with status "UP"
+    Then the "overview" display for "e2e" should show message "Info endpoint returned no data." in the info section
+    And the "overview" display for "e2e" should show health status "UP"
+
+  @no-data-message @env-display
+  Scenario: Displaying "No environment properties..." message for 'env' view from ActuatorDisplayComponent
+    Given the "e2e" environment tab is active and its overview data is loaded
+    When the "e2e" environment 'env' endpoint returns no specific data (e.g. data = { propertySources: [] } or data = null)
+    And the user clicks the "env" view tab
+    Then the message "No environment properties to display or the structure was not recognized." should be displayed on the 'env' view
+
+  @no-data-message @caches-display
+  Scenario: Displaying "No cache information available..." message for 'caches' view from ActuatorDisplayComponent
+    Given the "produsc" environment tab is active and its overview data is loaded
+    When the "produsc" environment 'caches' endpoint returns no specific data (e.g. data = { cacheManagers: {} } or data = null)
+    And the user clicks the "caches" view tab
+    Then the message "No cache information available or the structure was not recognized." should be displayed on the 'caches' view
+
+  @initial-state @no-data-message
+  Scenario: Displaying "not loaded yet" message for a newly selected environment from ActuatorMonitorComponent
+    Given the "ppr" environment tab is clicked
+    And no data has been loaded or attempted to load for "ppr" yet
+    Then the message "Data for PPR has not been loaded yet. Click refresh or select the environment again." should be displayed
