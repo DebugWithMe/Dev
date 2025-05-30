@@ -1,0 +1,47 @@
+export class OverviewDisplayPo { // Renamed class
+  private readonly componentSelector = 'app-overview-display';
+  private readonly healthSectionSelector = `${this.componentSelector} .health-section`;
+  private readonly overallHealthStatusBadgeSelector = `${this.healthSectionSelector} .overall-status-badge`;
+  private readonly healthStatusTextSelector = `${this.overallHealthStatusBadgeSelector} .status-text`;
+  private readonly appInfoSectionSelector = `${this.componentSelector} .info-section`;
+  private readonly infoTableSelector = `${this.appInfoSectionSelector} .info-table`;
+  private readonly alertSelector = `${this.componentSelector} .alert`;
+
+  getHealthStatusSection() {
+    return cy.get(this.healthSectionSelector);
+  }
+
+  getOverallHealthStatusBadge() {
+    return cy.get(this.overallHealthStatusBadgeSelector);
+  }
+
+  getHealthStatusText() {
+    return cy.get(this.healthStatusTextSelector);
+  }
+
+  getApplicationInfoSection() {
+    return cy.get(this.appInfoSectionSelector);
+  }
+
+  getInfoTable() {
+    return cy.get(this.infoTableSelector);
+  }
+
+  getAlert() {
+    return cy.get(this.alertSelector);
+  }
+
+  verifyHealthStatus(expectedStatus: string) {
+    this.getHealthStatusText().should('contain.text', expectedStatus.toUpperCase());
+  }
+
+  verifyApplicationInfoIsPresent() {
+    this.getInfoTable().should('be.visible');
+    this.getInfoTable().find('tbody tr').should('have.length.greaterThan', 0);
+    this.getInfoTable().should('contain.text', 'git');
+  }
+
+  verifyOverviewDisplayIsVisible() {
+    cy.get(this.componentSelector).should('be.visible');
+  }
+}
