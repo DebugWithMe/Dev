@@ -1,0 +1,51 @@
+@jazz-gui-acceptance-test @actuator-monitor @ui
+Feature: Actuator Monitor
+
+  Background:
+    Given the user visits the Actuator Monitor page
+    And API endpoints are mocked
+
+  @ci @initial-load @overview-display
+  Scenario: Default view and initial data load
+    Then the "DEV" environment tab should be active
+    And the "Overview" view tab should be active
+    And the Overview section should display health status "UP"
+    And the Overview section should display application info
+
+  @ci @tab-navigation @environment-tabs
+  Scenario: Switch environment tabs
+    When the user clicks on the "E2E" environment tab
+    Then the "E2E" environment tab should be active
+    And the "Overview" view tab should be active (or the last selected view for that env)
+    And data for "E2E" environment should be loading or displayed
+
+  @ci @tab-navigation @view-tabs
+  Scenario: Switch view tabs
+    Given the "DEV" environment tab is active
+    When the user clicks on the "Env" view tab
+    Then the "Env" view tab should be active
+    And the Environment properties view should be displayed for "DEV"
+    When the user clicks on the "Caches" view tab
+    Then the "Caches" view tab should be active
+    And the Caches view should be displayed for "DEV"
+
+  @ci @refresh-functionality
+  Scenario: Refresh button functionality
+    Given the "DEV" environment tab is active
+    When the user clicks the refresh button
+    Then data for "DEV" environment should be loading or re-loaded
+    And the refresh button icon should show a spinning animation and then stop
+
+  @ci @data-display @env-view
+  Scenario: Displaying data in Env view
+    Given the "DEV" environment tab is active
+    When the user clicks on the "Env" view tab
+    Then the "Env" view tab should be active
+    And the Environment properties view should list properties from "env.json"
+
+  @ci @data-display @caches-view
+  Scenario: Displaying data in Caches view
+    Given the "DEV" environment tab is active
+    When the user clicks on the "Caches" view tab
+    Then the "Caches" view tab should be active
+    And the Caches view should list cache names like "SafeAgent" and "IsStockExchange"
