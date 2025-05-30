@@ -1,0 +1,23 @@
+{
+  "git": {
+    "branch": "main",
+    "commit": {
+      "id": "ac277ca",
+      "time": "2025-02-18T21:31:53Z"
+    }
+  },
+  "build": {
+    "version": "2025.05.27-397-main",
+    "git": {
+      "commit-id": "ca7173bd2d5b1907d3a04453971468647de4adc0"
+    },
+    "artifact": "agent-interface-service-runtime",
+    "java": {
+      "source": "21",
+      "target": "21"
+    },
+    "name": "agent-interface-service-runtime",
+    "time": "2025-05-27T10:02:35.102Z",
+    "group": "settlements"
+  }
+}

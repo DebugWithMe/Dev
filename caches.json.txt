@@ -1,0 +1,17 @@
+{
+  "cacheManagers": {
+    "cacheManager": {
+      "caches": {
+        "SafeAgent": {
+          "target": "com.github.benmanes.caffeine.cache.BoundedLocalCache$BoundedLocalManualCache"
+        },
+        "IsStockExchange": {
+          "target": "com.github.benmanes.caffeine.cache.BoundedLocalCache$BoundedLocalManualCache"
+        },
+        "FirmAgentAccount": {
+          "target": "com.github.benmanes.caffeine.cache.BoundedLocalCache$BoundedLocalManualCache"
+        }
+      }
+    }
+  }
+}
