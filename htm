@@ -1,0 +1,437 @@
+<ng-container *ngIf="currentEnvironmentState$ | async as currentEnvState">
+  <div class="actuator-container" data-cy="actuator-monitor-container">
+    <div class="tabs-wrapper">
+      <div class="env-tabs-container">
+        <nav class="env-tabs" aria-label="Environments">
+          <button
+            *ngFor="let env of environments; trackBy: trackByEnv"
+            class="tab-btn"
+            [class.active]="env === selectedEnvironment"
+            (click)="onTabChange(env, selectedView)"
+            [attr.aria-pressed]="env === selectedEnvironment"
+            [attr.data-cy]="'env-tab-' + env">
+            {{ env.toUpperCase() }}
+          </button>
+        </nav>
+
+        <button
+          class="refresh-btn"
+          title="Refresh data for {{ selectedEnvironment.toUpperCase() }}"
+          (click)="refreshCurrentEnvironment()"
+          [disabled]="isLoading$ | async"
+          data-cy="refresh-btn">
+          <i class="fas fa-sync" [class.fa-spin]="isLoading$ | async"></i>
+          <span class="refresh-text">Refresh</span>
+        </button>
+      </div>
+      <nav class="endpoint-tabs" aria-label="Actuator Views">
+        <button
+          *ngFor="let tab of displayTabs; trackBy: trackByDisplayTab"
+          class="sub-tab-btn"
+          [class.active]="tab === selectedView"
+          (click)="onTabChange(selectedEnvironment, tab)"
+          [attr.aria-pressed]="tab === selectedView"
+          [class.has-error]="getTabError(currentEnvState, tab)"
+          [attr.data-cy]="'view-tab-' + tab">
+          <i
+            class="fas fa-fw"
+            [ngClass]="{
+              'fa-tachometer-alt': tab === 'overview',
+              'fa-leaf': tab === 'env',
+              'fa-database': tab === 'caches',
+              'fa-question-circle': !displayTabs.includes(tab)
+            }"
+            [attr.data-cy]="'view-tab-icon-' + tab"></i>
+          {{ tab | titlecase }}
+          <i
+            *ngIf="getTabError(currentEnvState, tab)"
+            class="fas fa-exclamation-triangle error-indicator"
+            [title]="getTabError(currentEnvState, tab) ?? 'Error loading data'"
+            [attr.data-cy]="'view-tab-error-indicator-' + tab"></i>
+        </button>
+      </nav>
+    </div>
+    <div class="content-area" data-cy="content-area">
+      <div *ngIf="isLoading$ | async" class="loading-container" role="status" aria-live="polite" data-cy="loading-container">
+        <div class="spinner"></div>
+        <span>Loading data for {{ selectedEnvironment.toUpperCase() }}...</span>
+      </div>
+
+      <div *ngIf="getGeneralError(currentEnvState) && (isLoading$ | async) === false" class="alert alert-danger" role="alert" data-cy="general-error-alert">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>Error:</strong> {{ getGeneralError(currentEnvState) }}
+        <button (click)="refreshCurrentEnvironment()" class="retry-btn" data-cy="retry-all-btn">Retry all</button>
+      </div>
+
+      <div *ngIf="(isLoading$ | async) === false && !getGeneralError(currentEnvState)" class="data-display">
+        <app-overview-display
+          *ngIf="selectedView === 'overview'"
+          [healthData]="getHealthData(currentEnvState)"
+          [healthError]="getHealthError(currentEnvState)"
+          [infoData]="getInfoData(currentEnvState)"
+          [infoError]="getInfoError(currentEnvState)"
+          [environment]="selectedEnvironment"
+          data-cy="overview-display-component">
+        </app-overview-display>
+
+        <ng-container *ngIf="selectedView !== 'overview'">
+          <div *ngIf="getErrorForView(currentEnvState, selectedView)" class="alert alert-warning" role="alert" [attr.data-cy]="'view-error-alert-' + selectedView">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Error loading {{ selectedView }}:</strong> {{ getErrorForView(currentEnvState, selectedView) }}
+          </div>
+          <app-actuator-display
+            *ngIf="!getErrorForView(currentEnvState, selectedView)"
+            [data]="getDataForView(currentEnvState, selectedView)"
+            [endpoint]="selectedView"
+            data-cy="actuator-display-component">
+          </app-actuator-display>
+        </ng-container>
+      </div>
+
+      <div *ngIf="(isLoading$ | async) === false && !getGeneralError(currentEnvState)">
+        <div
+          *ngIf="
+            selectedView === 'overview' &&
+            !getHealthData(currentEnvState) &&
+            !getInfoData(currentEnvState) &&
+            !getHealthError(currentEnvState) &&
+            !getInfoError(currentEnvState) &&
+            currentEnvState
+          "
+          class="no-data"
+          data-cy="no-data-overview">
+          No Health or Info data was returned for {{ selectedEnvironment.toUpperCase() }}.
+        </div>
+        <div
+          *ngIf="
+            selectedView !== 'overview' &&
+            !getDataForView(currentEnvState, selectedView) &&
+            !getErrorForView(currentEnvState, selectedView) &&
+            currentEnvState
+          "
+          class="no-data"
+          [attr.data-cy]="'no-data-view-' + selectedView">
+          No data was returned for {{ selectedView }} in {{ selectedEnvironment.toUpperCase() }}.
+        </div>
+        <div *ngIf="!currentEnvState" class="no-data" data-cy="no-data-env-not-loaded">
+          Data for {{ selectedEnvironment.toUpperCase() }} has not been loaded yet. Click refresh or select the environment again.
+        </div>
+      </div>
+    </div>
+  </div>
+</ng-container>
+
+
+
+<div class="overview-container" data-cy="overview-display-container">
+  <h4 class="overview-title">Overview of application health and info in {{ environment.toUpperCase() }} Environment</h4>
+
+  <div class="overview-grid" [ngClass]="getHealthComponents(healthData).length > 0 ? 'components-exists' : 'components-do-not-exists'">
+    <section class="health-section card" data-cy="health-section">
+      <header class="card-header"><i class="fas fa-heartbeat icon"></i> Health Status</header>
+      <div class="card-body">
+        <div *ngIf="healthError" class="alert alert-warning" data-cy="health-error-alert">
+          <i class="fas fa-exclamation-triangle"></i> Could not load health data: {{ healthError }}
+        </div>
+
+        <div *ngIf="!healthError && healthData" class="health-content">
+          <div class="overall-status-badge" [ngClass]="getHealthStatusClass(healthData.status)" data-cy="overall-health-status-badge">
+            <i class="fas fa-fw status-icon" [ngClass]="getHealthStatusIcon(healthData.status)" data-cy="health-status-icon"></i>
+            <span class="status-text" data-cy="health-status-text">{{ healthData.status || 'UNKNOWN' }}</span>
+          </div>
+
+          <div *ngIf="getHealthComponents(healthData).length > 0" class="components-table-wrapper">
+            <h4>Components</h4>
+            <table class="styled-table health-components-table" data-cy="health-components-table">
+              <thead>
+                <tr>
+                  <th>Component Name</th>
+                  <th>Status</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let comp of getHealthComponents(healthData); trackBy: trackByKey" [attr.data-cy]="'health-component-row-' + comp.key">
+                  <td class="component-key" data-cy="health-component-name">
+                    <strong>{{ comp.key }}</strong>
+                  </td>
+                  <td data-cy="health-component-status-cell">
+                    <span class="status-badge" [ngClass]="getHealthStatusClass(comp.value.status)" data-cy="health-component-status-badge">
+                      <i class="fas fa-fw" [ngClass]="getHealthStatusIcon(comp.value.status)"></i>
+                      {{ comp.value.status || 'UNKNOWN' }}
+                    </span>
+                  </td>
+                  <td data-cy="health-component-details-cell">
+                    <ng-container
+                      *ngIf="comp.value.details && getValueType(comp.value.details) === 'object' && getObjectKeys(comp.value.details).length > 0; else noDetailsOrPrimitive">
+                      <app-json-viewer-node [data]="comp.value.details" [displayNullAsNA]="true" [attr.data-cy]="'health-component-details-json-' + comp.key"></app-json-viewer-node>
+                    </ng-container>
+                    <ng-template #noDetailsOrPrimitive>
+                      <span *ngIf="!comp.value.details || getObjectKeys(comp.value.details).length === 0" [attr.data-cy]="'health-component-no-details-' + comp.key">-</span>
+                      <span *ngIf="comp.value.details && getValueType(comp.value.details) !== 'object'" [attr.data-cy]="'health-component-primitive-details-' + comp.key">{{ formatSimpleValue(comp.value.details) }}</span>
+                    </ng-template>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div *ngIf="getHealthComponents(healthData).length === 0" data-cy="no-health-components-message">
+            <p class="no-details">No detailed health components reported.</p>
+          </div>
+        </div>
+        <div *ngIf="!healthError && !healthData" data-cy="health-data-not-available-message">
+          <p class="no-details">Health data not available.</p>
+        </div>
+      </div>
+    </section>
+    <section class="info-section card" data-cy="info-section">
+      <header class="card-header"><i class="fas fa-info-circle icon"></i> Application Info</header>
+      <div class="card-body">
+        <div *ngIf="infoError" class="alert alert-warning" data-cy="info-error-alert">
+          <i class="fas fa-exclamation-triangle"></i> Could not load info data: {{ infoError }}
+        </div>
+
+        <div *ngIf="!infoError && infoData" class="info-content">
+           <table class="styled-table info-table" data-cy="info-table">
+            <thead>
+              <tr>
+                <th>Property</th>
+                <th>Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let infoKey of getObjectKeys(infoData); trackBy: trackByString" [attr.data-cy]="'info-row-' + infoKey">
+                <td data-cy="info-property-key">
+                  <strong>{{ infoKey }}</strong>
+                </td>
+                <td data-cy="info-property-value-cell">
+                  <app-json-viewer-node [data]="infoData[infoKey]" [attr.data-cy]="'info-property-value-json-' + infoKey"></app-json-viewer-node>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div *ngIf="getObjectKeys(infoData).length === 0" data-cy="info-no-data-message">
+            <p class="no-details">Info endpoint returned no data.</p>
+          </div>
+        </div>
+
+        <div *ngIf="!infoError && !infoData" data-cy="info-data-not-available-message">
+           <p class="no-details">Info data not available.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+
+
+
+
+
+<div [ngSwitch]="endpoint" class="actuator-content" data-cy="actuator-content-display">
+  <ng-container *ngSwitchCase="'health'">
+    <div *ngIf="processedDataType === 'health' && healthStatus" class="health-view" data-cy="actuator-health-view">
+      <div class="overall-status-badge" [ngClass]="getHealthStatusClass(healthStatus.status)" data-cy="actuator-health-overall-status-badge">
+        <i class="fas fa-fw status-icon" [ngClass]="getHealthStatusIcon(healthStatus.status)"></i>
+        <span class="status-text">{{ healthStatus.status || 'UNKNOWN' }}</span>
+      </div>
+
+      <div *ngIf="healthStatus.details" class="details-section" data-cy="actuator-health-details-section">
+        <h4>Details:</h4>
+        <pre data-cy="actuator-health-details-json">{{ healthStatus.details | json }}</pre>
+      </div>
+
+      <div *ngIf="getHealthComponents(healthStatus).length > 0" class="components-table-wrapper" data-cy="actuator-health-components-wrapper">
+        <h4>Components:</h4>
+        <table class="styled-table health-components-table" data-cy="actuator-health-components-table">
+          <thead>
+            <tr>
+              <th>Component Name</th>
+              <th>Status</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let comp of getHealthComponents(healthStatus); trackBy: trackByKey" [attr.data-cy]="'actuator-health-component-row-' + comp.key">
+              <td class="component-key" data-cy="actuator-health-component-name">
+                <strong>{{ comp.key }}</strong>
+              </td>
+              <td data-cy="actuator-health-component-status-cell">
+                <span class="status-badge" [ngClass]="getHealthStatusClass(comp.value.status)" data-cy="actuator-health-component-status-badge">
+                  <i class="fas fa-fw" [ngClass]="getHealthStatusIcon(comp.value.status)"></i>
+                  {{ comp.value.status || 'UNKNOWN' }}
+                </span>
+              </td>
+              <td data-cy="actuator-health-component-details-cell">
+                <ng-container *ngIf="isSimpleObject(comp.value.details) && getObjectKeys(comp.value.details).length < 4 && getObjectKeys(comp.value.details).length > 0; else detailsPre">
+                  <ul class="details-list" [attr.data-cy]="'actuator-health-component-simple-details-' + comp.key">
+                    <li *ngFor="let detailKey of getObjectKeys(comp.value.details); trackBy: trackByString">
+                      <strong>{{ detailKey }}:</strong> {{ formatSimpleValue(comp.value.details[detailKey]) }}
+                    </li>
+                  </ul>
+                </ng-container>
+                <ng-template #detailsPre>
+                  <pre *ngIf="comp.value.details" [attr.data-cy]="'actuator-health-component-json-details-' + comp.key">{{ comp.value.details | json }}</pre>
+                  <span *ngIf="!comp.value.details" [attr.data-cy]="'actuator-health-component-no-details-' + comp.key">-</span>
+                </ng-template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div *ngIf="getHealthComponents(healthStatus).length === 0" class="no-details" data-cy="actuator-no-health-components-message">
+        <p>No detailed health components reported.</p>
+      </div>
+    </div>
+    <div *ngIf="processedDataType === 'health' && !healthStatus" class="no-details" data-cy="actuator-health-data-unavailable">
+      <p>Health data not available or could not be processed.</p>
+    </div>
+  </ng-container>
+
+  <ng-container *ngSwitchCase="'env'">
+    <div *ngIf="processedDataType === 'env'" class="env-view" data-cy="env-view">
+      <div class="env-view-header">
+        <h4>Environment Properties ( Selected )</h4>
+        <button (click)="toggleEnvDataView()" class="toggle-view-btn btn btn-outline" data-cy="toggle-env-view-btn">
+          <i class="fas" [ngClass]="showFullEnvData ? 'fa-list-alt' : 'fa-file-alt'"></i>
+          {{ showFullEnvData ? 'Show Summary' : 'Show Full Raw Data' }}
+        </button>
+      </div>
+
+      <div *ngIf="!showFullEnvData" class="env-summary-view" data-cy="env-summary-view">
+        <p class="info-text">
+          Showing a curated list of properties based on defined filters. Use the search below or toggle to "Show Full Raw Data" for all details.
+        </p>
+        <div class="search-bar">
+          <input
+            type="text"
+            placeholder="Search properties..."
+            [(ngModel)]="envSearchTerm"
+            (ngModelChange)="filterEnvData()"
+            class="form-control"
+            data-cy="env-search-input"/>
+          <i class="fas fa-search search-icon"></i>
+        </div>
+        <table class="styled-table env-properties-table" *ngIf="filteredEnvProperties.length > 0; else noFilteredEnvData" data-cy="env-summary-properties-table">
+          <thead>
+            <tr>
+              <th>Property Name</th>
+              <th>Value</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let prop of filteredEnvProperties; trackBy: trackByPropName" [attr.data-cy]="'env-prop-row-' + prop.name">
+              <td class="prop-name" data-cy="env-prop-name">{{ prop.name }}</td>
+              <td class="prop-value" data-cy="env-prop-value">
+                <pre>{{ prop.value | json }}</pre> </td>
+              <td class="prop-source" data-cy="env-prop-source">{{ prop.source }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <ng-template #noFilteredEnvData>
+          <p *ngIf="envProperties.length > 0 && envSearchTerm" class="no-details" data-cy="no-filtered-env-data-message">
+            No summarized properties match your search term: "{{ envSearchTerm }}".
+          </p>
+          <p *ngIf="envProperties.length === 0" class="no-details" data-cy="no-summary-env-data-message">
+            No environment properties matched the defined filters for the summary view.
+          </p>
+        </ng-template>
+      </div>
+
+      <div *ngIf="showFullEnvData" class="env-full-data-view" data-cy="env-full-data-view">
+        <p class="info-text">Showing the complete raw environment data. This can be extensive.</p>
+        <app-json-viewer-node [data]="rawEnvDataForViewer" data-cy="env-full-raw-data-viewer"></app-json-viewer-node>
+      </div>
+    </div>
+    <div *ngIf="processedDataType !== 'env' && endpoint === 'env'" class="no-details" data-cy="env-data-unavailable">
+      <p>Environment data not available or could not be processed.</p>
+    </div>
+  </ng-container>
+
+  <ng-container *ngSwitchCase="'caches'">
+    <div *ngIf="processedDataType === 'key-value'" class="key-value-view caches-view" data-cy="caches-view">
+      <h4>Available Caches</h4>
+      <table class="styled-table key-value-table" *ngIf="genericKeyValueData.length > 0; else noCachesData" data-cy="caches-table">
+        <thead>
+          <tr>
+            <th>Cache Name</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of genericKeyValueData; trackBy: trackByKey" [attr.data-cy]="'cache-row-' + item.key">
+            <td class="key-cell" data-cy="cache-name">
+              <strong>{{ item.key }}</strong>
+            </td>
+            <td class="value-cell" data-cy="cache-details-cell">
+              <app-json-viewer-node [data]="item.value" [attr.data-cy]="'cache-details-json-' + item.key"></app-json-viewer-node>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <ng-template #noCachesData>
+        <p class="no-details" data-cy="no-caches-data-message">No cache information available or the structure was not recognized.</p>
+      </ng-template>
+    </div>
+    <div *ngIf="processedDataType !== 'key-value' && endpoint === 'caches'" class="no-details" data-cy="caches-data-unavailable">
+      <p>Cache data not available or could not be processed.</p>
+    </div>
+  </ng-container>
+
+  <ng-container *ngSwitchDefault>
+    <div *ngIf="data; else noDefaultData" class="generic-view" [attr.data-cy]="'generic-view-' + endpoint">
+      <h4>{{ endpoint | titlecase }} Data</h4>
+      <pre class="json-viewer" data-cy="generic-view-json">{{ genericData }}</pre>
+    </div>
+    <ng-template #noDefaultData>
+      <p class="no-details" [attr.data-cy]="'no-data-message-' + endpoint">Data for {{ endpoint }} not available.</p>
+    </ng-template>
+  </ng-container>
+</div>
+
+
+
+
+
+
+<div class="node-wrapper" [style.padding-left.px]="level > 0 ? 20 : 0" [attr.data-cy]="'json-node-level-' + level">
+  <ng-container [ngSwitch]="dataType">
+    <ng-container *ngSwitchCase="'object'">
+      <div *ngIf="level < maxLevel" class="json-object-container" data-cy="json-object-container">
+        <table class="json-object-table">
+          <tbody>
+            <tr *ngFor="let key of getObjectKeys(data); trackBy: trackByString" [attr.data-cy]="'json-object-row-' + key">
+              <th [attr.data-cy]="'json-object-key-' + key">{{ key }}</th>
+              <td>
+                 <app-json-viewer-node [data]="data[key]" [level]="level + 1" [displayNullAsNA]="displayNullAsNA"></app-json-viewer-node>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div *ngIf="getObjectKeys(data).length === 0" class="empty-node" data-cy="json-empty-object">{{ '{}' }}</div>
+      </div>
+      <div *ngIf="level >= maxLevel" class="recursion-limit" data-cy="json-recursion-limit">[Max depth reached]</div>
+    </ng-container>
+
+    <ng-container *ngSwitchCase="'array'">
+       <div *ngIf="level < maxLevel" class="json-array-container" data-cy="json-array-container">
+        <ol class="json-array-list">
+          <li *ngFor="let item of data; index as i; trackBy: trackByIndex" [attr.data-cy]="'json-array-item-' + i">
+            <app-json-viewer-node [data]="item" [level]="level + 1" [displayNullAsNA]="displayNullAsNA"></app-json-viewer-node>
+          </li>
+        </ol>
+        <div *ngIf="data.length === 0" class="empty-node" data-cy="json-empty-array">{{ '[]' }}</div>
+      </div>
+      <div *ngIf="level >= maxLevel" class="recursion-limit" data-cy="json-recursion-limit-array">[Max depth reached]</div>
+    </ng-container>
+
+    <ng-container *ngSwitchCase="'primitive'">
+      <span class="json-primitive" [ngClass]="primitiveClass" data-cy="json-primitive-value">
+        {{ data === null ? 'null' : data === undefined ? 'undefined' : data }}
+      </span>
+    </ng-container>
+  </ng-container>
+</div>
+
+
