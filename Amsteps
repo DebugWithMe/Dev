@@ -1,0 +1,69 @@
+import { Given, When, Then, And } from 'cypress-cucumber-preprocessor/steps';
+import { ActuatorMonitorPo } from '../../pages/ActuatorMonitor.po';
+import { OverviewDisplayPo } from '../../pages/OverviewDisplay.po';
+import { ActuatorDisplayPo } from '../../pages/ActuatorDisplay.po';
+import { ActuatorEnvironmentTabEnum, ActuatorViewTabEnum } from '../../support/enums/actuator-monitor.enum';
+
+const actuatorMonitorPo = new ActuatorMonitorPo();
+const overviewDisplayPo = new OverviewDisplayPo();
+const actuatorDisplayPo = new ActuatorDisplayPo();
+
+// ... (other steps remain the same) ...
+
+Then('data for "{word}" environment should be loading or displayed', (envName: string) => {
+  // This step checks for an intermediate loading state which can be quick.
+  // It attempts to see the loading indicator, then waits for it to disappear.
+  // If the loading indicator isn't caught, it assumes the content is already loaded.
+
+  // Using a Cypress command to handle conditional existence/visibility
+  // by trying to get the element and then acting based on its state.
+  cy.get('body').then($body => {
+    // Check if the loading container is potentially in the DOM and visible
+    // This check uses the PO method which now targets data-cy
+    const loadingContainerElement = $body.find('[data-cy="loading-container"]');
+
+    if (loadingContainerElement.length > 0 && Cypress.dom.isVisible(loadingContainerElement)) {
+      // If loading container was found and is visible, assert spinner and wait for disappearance
+      actuatorMonitorPo.getLoadingContainer().find('.spinner').should('be.visible');
+      // The *ngIf on isLoading$ makes the whole container disappear
+      actuatorMonitorPo.getLoadingContainer().should('not.be.visible', { timeout: 10000 });
+    } else {
+      // If loading container wasn't visible (e.g., loading was too fast or didn't trigger for this view),
+      // expect the main content area to be visible.
+      // Subsequent steps will verify the actual data.
+      actuatorMonitorPo.getContentArea().should('be.visible');
+    }
+  });
+
+  // Ensure relevant API calls for the specific environment have a chance to complete
+  // These aliases are set in the "API endpoints are mocked" step
+  if (envName.toLowerCase() === 'dev') {
+    cy.wait(['@getDevHealth', '@getDevInfo', '@getDevEnv', '@getDevCaches'], { timeout: 10000 }).then((interceptions) => {
+      interceptions.forEach(interception => {
+        expect(interception.response.statusCode).to.be.oneOf([200, 201, 204]); // Or any valid success codes
+      });
+    });
+  } else if (envName.toLowerCase() === 'e2e') {
+    cy.wait(['@getE2EHealth', '@getE2EInfo', '@getE2EEnv', '@getE2ECaches'], { timeout: 10000 }).then((interceptions) => {
+      interceptions.forEach(interception => {
+        expect(interception.response.statusCode).to.be.oneOf([200, 201, 204]);
+      });
+    });
+  }
+  // Add more conditions for other environments if they have specific mock aliases
+});
+
+// ... (other step definitions like 'the "{word}" environment tab should be active"', etc., should not need changes
+// because the PO methods they call, e.g., actuatorMonitorPo.getEnvironmentTab(...),
+// still return the same type of Cypress object, even if their internal selectors changed to data-cy)
+// For example:
+
+// Then('the "{word}" environment tab should be active', (envName: string) => {
+//   const envTabKey = envName.toUpperCase() as keyof typeof ActuatorEnvironmentTabEnum;
+//   actuatorMonitorPo.getEnvironmentTab(ActuatorEnvironmentTabEnum[envTabKey]) // This call is unchanged
+//     .should('have.class', 'active') // This assertion is on the element returned by the PO method
+//     .and('have.attr', 'aria-pressed', 'true');
+// });
+
+// This remains correct because `getEnvironmentTab` still correctly identifies and returns the tab element,
+// now using a data-cy selector internally.
