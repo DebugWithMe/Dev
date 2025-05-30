@@ -1,0 +1,49 @@
+export class ActuatorDisplayPo { // Renamed class
+  private readonly componentSelector = 'app-actuator-display';
+  private readonly envViewContainerSelector = `${this.componentSelector} .env-view`;
+  private readonly envPropertiesTableSelector = `${this.envViewContainerSelector} .env-properties-table`;
+  private readonly cachesViewContainerSelector = `${this.componentSelector} .caches-view`;
+  private readonly cachesTableSelector = `${this.cachesViewContainerSelector} .key-value-table`;
+  private readonly genericViewSelector = `${this.componentSelector} .generic-view pre.json-viewer`;
+  private readonly noDetailsSelector = '.no-details';
+
+  getEnvViewContainer() {
+    return cy.get(this.envViewContainerSelector);
+  }
+
+  getEnvPropertiesTable() {
+    return cy.get(this.envPropertiesTableSelector);
+  }
+
+  getCachesViewContainer() {
+    return cy.get(this.cachesViewContainerSelector);
+  }
+
+  getCachesTable() {
+    return cy.get(this.cachesTableSelector);
+  }
+
+  getGenericViewData() {
+    return cy.get(this.genericViewSelector);
+  }
+
+  getNoDetailsMessage(parentContext?: Cypress.Chainable<JQuery<HTMLElement>>) {
+    const chain = parentContext ? parentContext : cy;
+    return chain.find(this.noDetailsSelector);
+  }
+
+  verifyEnvPropertyExists(propertyName: string, propertyValue?: string) {
+    this.getEnvPropertiesTable().should('contain.text', propertyName);
+    if (propertyValue) {
+      this.getEnvPropertiesTable().contains('td, th', propertyName).parent('tr').should('contain.text', propertyValue);
+    }
+  }
+
+  verifyCacheExists(cacheName: string) {
+    this.getCachesTable().find('.key-cell').should('contain.text', cacheName);
+  }
+
+  verifyActuatorDisplayIsVisible() {
+    cy.get(this.componentSelector).should('be.visible');
+  }
+}
