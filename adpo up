@@ -1,0 +1,103 @@
+export class ActuatorDisplayPo {
+  getActuatorContentDisplay() {
+    return cy.get('[data-cy="actuator-content-display"]');
+  }
+
+  // --- Health View Specific (within Actuator Display) ---
+  getActuatorHealthView() {
+    return cy.get('[data-cy="actuator-health-view"]');
+  }
+
+  getActuatorHealthOverallStatusBadge() {
+    return cy.get('[data-cy="actuator-health-overall-status-badge"]');
+  }
+  // ... (add more for health view if needed, e.g., tables, specific details)
+
+  // --- Env View ---
+  getEnvView() {
+    return cy.get('[data-cy="env-view"]');
+  }
+
+  getToggleEnvViewButton() {
+    return cy.get('[data-cy="toggle-env-view-btn"]');
+  }
+
+  getEnvSearchInput() {
+    return cy.get('[data-cy="env-search-input"]');
+  }
+
+  getEnvSummaryPropertiesTable() {
+    return cy.get('[data-cy="env-summary-properties-table"]');
+  }
+
+  getEnvPropertyRow(propertyName: string) {
+    // Assuming propertyName is sanitized for use in selector if it contains special chars
+    return this.getEnvSummaryPropertiesTable().find(`[data-cy="env-prop-row-${propertyName}"]`);
+  }
+
+  getNoFilteredEnvDataMessage() {
+    return cy.get('[data-cy="no-filtered-env-data-message"]');
+  }
+
+  getEnvFullRawDataViewer() {
+    return cy.get('[data-cy="env-full-raw-data-viewer"]');
+  }
+
+  // --- Caches View ---
+  getCachesView() {
+    return cy.get('[data-cy="caches-view"]');
+  }
+
+  getCachesTable() {
+    return cy.get('[data-cy="caches-table"]');
+  }
+
+  getCacheRow(cacheKey: string) {
+    // Assuming cacheKey is sanitized
+    return this.getCachesTable().find(`[data-cy="cache-row-${cacheKey}"]`);
+  }
+
+  getCacheNameFromRow(cacheKey: string) {
+    return this.getCacheRow(cacheKey).find('[data-cy="cache-name"]');
+  }
+
+  getCacheDetailsJsonFromRow(cacheKey: string) {
+    return this.getCacheRow(cacheKey).find(`[data-cy="cache-details-json-${cacheKey}"]`);
+  }
+
+  getNoCachesDataMessage() {
+    return cy.get('[data-cy="no-caches-data-message"]');
+  }
+
+  // --- Generic View (for other endpoints) ---
+  getGenericView(endpoint: string) {
+    return cy.get(`[data-cy="generic-view-${endpoint}"]`);
+  }
+
+  getGenericViewJson(endpoint: string) {
+    return this.getGenericView(endpoint).find('[data-cy="generic-view-json"]');
+  }
+
+  getNoDataMessageForEndpoint(endpoint: string) {
+    return cy.get(`[data-cy="no-data-message-${endpoint}"]');
+  }
+
+
+  // --- Verification Methods (adjust/add as needed) ---
+  verifyActuatorDisplayIsVisible() {
+    this.getActuatorContentDisplay().should('be.visible');
+  }
+
+  verifyEnvPropertyExistsInSummary(propertyName: string, propertyValue?: string) {
+    const row = this.getEnvPropertyRow(propertyName);
+    row.should('be.visible');
+    row.find('[data-cy="env-prop-name"]').should('contain.text', propertyName);
+    if (propertyValue) {
+      row.find('[data-cy="env-prop-value"]').should('contain.text', propertyValue);
+    }
+  }
+
+  verifyCacheExistsInTable(cacheName: string) {
+    this.getCacheNameFromRow(cacheName).should('contain.text', cacheName);
+  }
+}
