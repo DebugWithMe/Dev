@@ -1,0 +1,228 @@
+You've provided an excellent example of a Page Object Model (FeatureTogglePage.ts)! It showcases several best practices like inheritance from a base page, composition with component-specific objects, clear action methods, and the use of enums.
+I've kept these principles in mind when designing the Page Object Model files for the ActuatorMonitorComponent and its related components. Let's refine them and see how they align with your example.
+1. Enums for Tab Identifiers
+Inspired by your FeatureToggleTabEnum, we can define enums for the environment tabs and view tabs within the Actuator Monitor. This enhances readability and maintainability.
+Create a new directory gsp-jazz-gui-e2e/src/support/enums/ if it doesn't exist.
+File: gsp-jazz-gui-e2e/src/support/enums/actuator-monitor.enum.ts
+export enum ActuatorEnvironmentTabEnum {
+  DEV = 'DEV',
+  E2E = 'E2E',
+  E2EUSC = 'E2EUSC',
+  PPR = 'PPR',
+  PROD = 'PROD',
+  PRODUSC = 'PRODUSC',
+}
+
+export enum ActuatorViewTabEnum {
+  OVERVIEW = 'Overview',
+  ENV = 'Env',
+  CACHES = 'Caches',
+  METRICS = 'Metrics',
+  MAPPINGS = 'Mappings',
+  BEANS = 'Beans',
+  SCHEDULED_TASKS = 'Scheduled Tasks',
+  THREAD_DUMP = 'Thread Dump',
+  LOGGERS = 'Loggers',
+}
+
+(Note: I've included all known tabs from Am.txt for completeness, even if not all are used in the current tests).
+2. Updated Page Object Models (POMs)
+Here's how the POMs we discussed earlier can be structured, taking cues from your FeatureTogglePage.ts:
+File: gsp-jazz-gui-e2e/src/support/components/ActuatorMonitorPage.ts
+(This is the main "page" for the Actuator Monitor feature)
+import { ActuatorEnvironmentTabEnum, ActuatorViewTabEnum } from '../enums/actuator-monitor.enum';
+
+export class ActuatorMonitorPage {
+  // Private selectors (similar to your #historyGridId)
+  private readonly containerSelector = 'app-actuator-monitor .actuator-container'; // Main component container from Am.txt
+  private readonly envTabsSelector = '.env-tabs .tab-btn'; // From Am.txt
+  private readonly viewTabsSelector = '.endpoint-tabs .sub-tab-btn'; // From Am.txt
+  private readonly refreshButtonSelector = '.env-tabs-container .refresh-btn'; // From Am.txt
+  private readonly loadingSpinnerSelector = '.loading-container .spinner'; // From Am.txt
+  private readonly activeEnvTabSelector = `${this.envTabsSelector}.active`;
+  private readonly activeViewTabSelector = `${this.viewTabsSelector}.active`;
+  private readonly contentAreaSelector = '.content-area'; // From Am.txt
+
+  // If you had a base page like your `MainPage`, this class could extend it:
+  // export class ActuatorMonitorPage extends MainPage {
+
+  // visit() {
+  //   super.visit(); // Assuming base visit navigates to the app's root
+  //   // If Actuator Monitor is not the landing page, add navigation:
+  //   // this.goToMenu(SideBarMenuItemEnum.ActuatorMonitor); // Hypothetical
+  //   cy.visit('/actuator-monitor-route'); // Or directly visit its route
+  //   this.verifyActuatorMonitorIsVisible();
+  // }
+
+  getEnvironmentTab(env: ActuatorEnvironmentTabEnum | string) { // Allow string for flexibility if enum isn't exhaustive
+    return cy.contains(this.envTabsSelector, env.toString().toUpperCase());
+  }
+
+  getViewTab(view: ActuatorViewTabEnum | string) {
+    // Assuming view names in UI are title-cased (e.g., "Overview", "Env")
+    return cy.contains(this.viewTabsSelector, view.toString(), { matchCase: false });
+  }
+
+  getRefreshButton() {
+    return cy.get(this.refreshButtonSelector);
+  }
+
+  getLoadingSpinner() {
+    return cy.get(this.loadingSpinnerSelector);
+  }
+
+  getActiveEnvironmentTab() {
+    return cy.get(this.activeEnvTabSelector);
+  }
+
+  getActiveViewTab() {
+    return cy.get(this.activeViewTabSelector);
+  }
+
+  getContentArea() {
+    return cy.get(this.contentAreaSelector);
+  }
+
+  verifyActuatorMonitorIsVisible() {
+    cy.get(this.containerSelector).should('be.visible');
+  }
+
+  // Example of a method combining actions, similar to your goToTab
+  selectEnvironment(env: ActuatorEnvironmentTabEnum) {
+    this.getEnvironmentTab(env).click();
+    this.getActiveEnvironmentTab().should('contain.text', env.toString().toUpperCase());
+  }
+
+  selectView(view: ActuatorViewTabEnum) {
+    this.getViewTab(view).click();
+    this.getActiveViewTab().should('contain.text', view.toString());
+  }
+}
+
+Alignment with your FeatureTogglePage.ts example:
+ * Encapsulated Selectors: Selectors are defined as private readonly properties.
+ * Clear Action Methods: Methods like selectEnvironment() and selectView() are provided.
+ * Getters for Elements: Methods like getEnvironmentTab(), getActiveEnvironmentTab(), etc., return Cypress chainable objects.
+ * Use of Enums: ActuatorEnvironmentTabEnum and ActuatorViewTabEnum are used for selecting tabs.
+ * No Base Page Extension (Yet): This version doesn't extend a MainPage as its structure wasn't provided for this context. If you have one, ActuatorMonitorPage could extend it.
+ * No Direct Component Composition (in this file): Unlike your example that has _migrationGrid = new FeatureToggleGridComponent(), the ActuatorMonitorPage itself doesn't directly instantiate OverviewDisplayPage or ActuatorDisplayPage. Instead, the step definitions will use instances of these component-specific POs when interacting with those parts of the UI. This is a valid approach, especially when child components are relatively independent sections of the view. If ActuatorMonitorPage needed to orchestrate complex interactions between these child components, direct composition might be more beneficial.
+File: gsp-jazz-gui-e2e/src/support/components/OverviewDisplayPage.ts
+(This acts as a "component object" for the app-overview-display part)
+export class OverviewDisplayPage {
+  private readonly componentSelector = 'app-overview-display'; // From Od.txt
+  private readonly healthSectionSelector = `${this.componentSelector} .health-section`; // From Od.txt
+  private readonly overallHealthStatusBadgeSelector = `${this.healthSectionSelector} .overall-status-badge`; // From Od.txt
+  private readonly healthStatusTextSelector = `${this.overallHealthStatusBadgeSelector} .status-text`; // From Od.txt
+  private readonly appInfoSectionSelector = `${this.componentSelector} .info-section`; // From Od.txt
+  private readonly infoTableSelector = `${this.appInfoSectionSelector} .info-table`; // From Od.txt
+  private readonly alertSelector = `${this.componentSelector} .alert`; // From Od.txt
+
+  getHealthStatusSection() {
+    return cy.get(this.healthSectionSelector);
+  }
+
+  getOverallHealthStatusBadge() {
+    return cy.get(this.overallHealthStatusBadgeSelector);
+  }
+
+  getHealthStatusText() {
+    return cy.get(this.healthStatusTextSelector);
+  }
+
+  getApplicationInfoSection() {
+    return cy.get(this.appInfoSectionSelector);
+  }
+
+  getInfoTable() {
+    return cy.get(this.infoTableSelector);
+  }
+
+  getAlert() {
+    return cy.get(this.alertSelector);
+  }
+
+  verifyHealthStatus(expectedStatus: string) {
+    this.getHealthStatusText().should('contain.text', expectedStatus.toUpperCase());
+  }
+
+  verifyApplicationInfoIsPresent() {
+    this.getInfoTable().should('be.visible');
+    this.getInfoTable().find('tbody tr').should('have.length.greaterThan', 0);
+    // Example: Check for a common key from your info.json.txt (e.g., 'git')
+    this.getInfoTable().should('contain.text', 'git');
+  }
+
+  verifyOverviewDisplayIsVisible() {
+    cy.get(this.componentSelector).should('be.visible');
+  }
+}
+
+
+File: gsp-jazz-gui-e2e/src/support/components/ActuatorDisplayPage.ts
+(This acts as a "component object" for the app-actuator-display part)
+export class ActuatorDisplayPage {
+  private readonly componentSelector = 'app-actuator-display'; // From Ad.txt
+  private readonly envViewContainerSelector = `${this.componentSelector} .env-view`; // From Ad.txt (for curated view)
+  // Selector for the properties table within the env-view (assuming one exists with this class from Ad.txt)
+  private readonly envPropertiesTableSelector = `${this.envViewContainerSelector} .env-properties-table`; // From Ad.txt
+  private readonly cachesViewContainerSelector = `${this.componentSelector} .caches-view`; // From Ad.txt
+  // Selector for the table within caches-view
+  private readonly cachesTableSelector = `${this.cachesViewContainerSelector} .key-value-table`; // From Ad.txt
+  private readonly genericViewSelector = `${this.componentSelector} .generic-view pre.json-viewer`; // From Ad.txt
+  private readonly noDetailsSelector = '.no-details'; // General selector from Ad.txt
+
+  getEnvViewContainer() {
+    return cy.get(this.envViewContainerSelector);
+  }
+
+  getEnvPropertiesTable() {
+    // This selector might need refinement based on actual rendered HTML of the curated env view
+    // The provided Ad.txt shows complex conditional rendering for env.
+    // If 'app-json-viewer-node' is directly inside 'env-view' for this, target that.
+    // For now, assuming a table structure is used for the curated list.
+    return cy.get(this.envPropertiesTableSelector);
+  }
+
+  getCachesViewContainer() {
+    return cy.get(this.cachesViewContainerSelector);
+  }
+
+  getCachesTable() {
+    return cy.get(this.cachesTableSelector);
+  }
+
+  getGenericViewData() {
+    return cy.get(this.genericViewSelector);
+  }
+
+  getNoDetailsMessage(parentContext?: Cypress.Chainable<JQuery<HTMLElement>>) {
+    const chain = parentContext ? parentContext : cy;
+    return chain.find(this.noDetailsSelector);
+  }
+
+  verifyEnvPropertyExists(propertyName: string, propertyValue?: string) {
+    // This will depend heavily on how the env data (especially from app-json-viewer-node) is rendered.
+    // If it's a simple table:
+    this.getEnvPropertiesTable().should('contain.text', propertyName);
+    if (propertyValue) {
+      // A more robust way would be to find the row containing propertyName, then find the value in that row.
+      this.getEnvPropertiesTable().contains('td, th', propertyName).parent('tr').should('contain.text', propertyValue);
+    }
+  }
+
+  verifyCacheExists(cacheName: string) {
+    this.getCachesTable().find('.key-cell').should('contain.text', cacheName); // '.key-cell' from Ad.txt
+  }
+
+  verifyActuatorDisplayIsVisible() {
+    cy.get(this.componentSelector).should('be.visible');
+  }
+}
+
+Key improvements and alignment:
+ * Private Selectors: More consistent use of private readonly for selector strings.
+ * Component-Specific Focus: OverviewDisplayPage and ActuatorDisplayPage are focused on their respective Angular components (app-overview-display and app-actuator-display), acting like the FeatureToggleGridComponent or FeatureToggleDetailsStepperComponent in your example—they manage a specific part of the UI.
+ * Selector Robustness:
+   * The selectors are based on the HTML structure inferred from your .txt files (Am.txt, Od.txt, Ad.txt).
+   * Best Practice Recommendation: For even more robust tests, I strongly recommend adding data-cy attributes (e.g., data-cy="environment-tab-dev", data-cy="health-status-badge") to your Angular component templates. Then, your POMs can use selectors like cy.get('[data-cy="health-status-badge"]'), which are less likely to break if CSS classes or HTML structure changes for styling purposes.
+These updated POMs should provide a good structure, drawing from the strengths of your FeatureTogglePage.ts example, while being tailored to the Actuator Monitor components.
