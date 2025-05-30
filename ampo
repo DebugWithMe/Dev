@@ -1,53 +1,98 @@
-import { ActuatorEnvironmentTabEnum, ActuatorViewTabEnum } from '../support/enums/actuator-monitor.enum'; // Adjusted path
+import { ActuatorEnvironmentTabEnum, ActuatorViewTabEnum } from '../support/enums/actuator-monitor.enum';
 
-export class ActuatorMonitorPo { // Renamed class
-  private readonly containerSelector = 'app-actuator-monitor .actuator-container';
-  private readonly envTabsSelector = '.env-tabs .tab-btn';
-  private readonly viewTabsSelector = '.endpoint-tabs .sub-tab-btn';
-  private readonly refreshButtonSelector = '.env-tabs-container .refresh-btn';
-  private readonly loadingSpinnerSelector = '.loading-container .spinner';
-  private readonly activeEnvTabSelector = `${this.envTabsSelector}.active`;
-  private readonly activeViewTabSelector = `${this.viewTabsSelector}.active`;
-  private readonly contentAreaSelector = '.content-area';
+export class ActuatorMonitorPo {
+  // --- Main Page Elements ---
+  getContainer() {
+    return cy.get('[data-cy="actuator-monitor-container"]');
+  }
 
   getEnvironmentTab(env: ActuatorEnvironmentTabEnum | string) {
-    return cy.contains(this.envTabsSelector, env.toString().toUpperCase());
+    // Assuming env parameter matches the value used in data-cy (e.g., 'dev', 'e2e')
+    return cy.get(`[data-cy="env-tab-${env.toString().toLowerCase()}"]`);
   }
 
   getViewTab(view: ActuatorViewTabEnum | string) {
-    return cy.contains(this.viewTabsSelector, view.toString(), { matchCase: false });
+    // Converts "Scheduled Tasks" or ActuatorViewTabEnum.SCHEDULED_TASKS to "scheduledtasks" for the selector
+    const viewSelectorPart = view.toString().toLowerCase().replace(/\s+/g, '');
+    return cy.get(`[data-cy="view-tab-${viewSelectorPart}"]`);
   }
 
   getRefreshButton() {
-    return cy.get(this.refreshButtonSelector);
+    return cy.get('[data-cy="refresh-btn"]');
   }
 
-  getLoadingSpinner() {
-    return cy.get(this.loadingSpinnerSelector);
+  getLoadingContainer() {
+    return cy.get('[data-cy="loading-container"]');
   }
+
   getActiveEnvironmentTab() {
-    return cy.get(this.activeEnvTabSelector);
+    // Relies on the .active class or aria-pressed for identifying active tab
+    return cy.get('[data-cy^="env-tab-"]').filter('.active');
+    // Alternative: cy.get('[data-cy^="env-tab-"][aria-pressed="true"]');
   }
 
   getActiveViewTab() {
-    return cy.get(this.activeViewTabSelector);
+    return cy.get('[data-cy^="view-tab-"]').filter('.active');
+    // Alternative: cy.get('[data-cy^="view-tab-"][aria-pressed="true"]');
   }
 
   getContentArea() {
-    return cy.get(this.contentAreaSelector);
+    return cy.get('[data-cy="content-area"]');
   }
 
+  // --- Error and Message Handling ---
+  getGeneralErrorAlert() {
+    return cy.get('[data-cy="general-error-alert"]');
+  }
+
+  getRetryAllButton() {
+    return cy.get('[data-cy="retry-all-btn"]');
+  }
+
+  getViewErrorAlert(view: ActuatorViewTabEnum | string) {
+    const viewSelectorPart = view.toString().toLowerCase().replace(/\s+/g, '');
+    return cy.get(`[data-cy="view-error-alert-${viewSelectorPart}"]`);
+  }
+
+  getViewTabErrorIndicator(view: ActuatorViewTabEnum | string) {
+    const viewSelectorPart = view.toString().toLowerCase().replace(/\s+/g, '');
+    return cy.get(`[data-cy="view-tab-error-indicator-${viewSelectorPart}"]`);
+  }
+
+  getNoDataOverviewMessage() {
+    return cy.get('[data-cy="no-data-overview"]');
+  }
+
+  getNoDataForViewMessage(view: ActuatorViewTabEnum | string) {
+    const viewSelectorPart = view.toString().toLowerCase().replace(/\s+/g, '');
+    return cy.get(`[data-cy="no-data-view-${viewSelectorPart}"]`);
+  }
+
+  getEnvNotLoadedMessage() {
+    return cy.get('[data-cy="no-data-env-not-loaded"]');
+  }
+
+  // --- Child Component Locators ---
+  getOverviewDisplayComponent() {
+    return cy.get('[data-cy="overview-display-component"]');
+  }
+
+  getActuatorDisplayComponent() {
+    return cy.get('[data-cy="actuator-display-component"]');
+  }
+
+  // --- Combined Actions (from previous version, still valid) ---
   verifyActuatorMonitorIsVisible() {
-    cy.get(this.containerSelector).should('be.visible');
+    this.getContainer().should('be.visible');
   }
 
   selectEnvironment(env: ActuatorEnvironmentTabEnum) {
     this.getEnvironmentTab(env).click();
-    this.getActiveEnvironmentTab().should('contain.text', env.toString().toUpperCase());
+    this.getEnvironmentTab(env).should('have.class', 'active'); // Or check aria-pressed
   }
 
   selectView(view: ActuatorViewTabEnum) {
     this.getViewTab(view).click();
-    this.getActiveViewTab().should('contain.text', view.toString());
+    this.getViewTab(view).should('have.class', 'active'); // Or check aria-pressed
   }
 }
