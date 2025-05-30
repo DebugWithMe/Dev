@@ -1,0 +1,103 @@
+export class OverviewDisplayPo {
+  getContainer() {
+    return cy.get('[data-cy="overview-display-container"]');
+  }
+
+  // --- Health Section ---
+  getHealthSection() {
+    return cy.get('[data-cy="health-section"]');
+  }
+
+  getHealthErrorAlert() {
+    return cy.get('[data-cy="health-error-alert"]');
+  }
+
+  getOverallHealthStatusBadge() {
+    return cy.get('[data-cy="overall-health-status-badge"]');
+  }
+
+  getHealthStatusText() {
+    return cy.get('[data-cy="health-status-text"]');
+  }
+
+  getHealthStatusIcon() {
+    return cy.get('[data-cy="health-status-icon"]');
+  }
+
+  getHealthComponentsTable() {
+    return cy.get('[data-cy="health-components-table"]');
+  }
+
+  getHealthComponentRow(componentKey: string) {
+    return this.getHealthComponentsTable().find(`[data-cy="health-component-row-${componentKey}"]`);
+  }
+
+  getHealthComponentNameFromRow(componentKey: string) {
+    return this.getHealthComponentRow(componentKey).find('[data-cy="health-component-name"]');
+  }
+
+  getHealthComponentStatusBadgeFromRow(componentKey: string) {
+    return this.getHealthComponentRow(componentKey).find('[data-cy="health-component-status-badge"]');
+  }
+
+  getHealthComponentDetailsJsonFromRow(componentKey: string) {
+    return this.getHealthComponentRow(componentKey).find(`[data-cy="health-component-details-json-${componentKey}"]`);
+  }
+
+  getNoHealthComponentsMessage() {
+    return cy.get('[data-cy="no-health-components-message"]');
+  }
+
+  getHealthDataNotAvailableMessage() {
+    return cy.get('[data-cy="health-data-not-available-message"]');
+  }
+
+  // --- Info Section ---
+  getInfoSection() {
+    return cy.get('[data-cy="info-section"]');
+  }
+
+  getInfoErrorAlert() {
+    return cy.get('[data-cy="info-error-alert"]');
+  }
+
+  getInfoTable() {
+    return cy.get('[data-cy="info-table"]');
+  }
+
+  getInfoRow(infoKey: string) {
+    return this.getInfoTable().find(`[data-cy="info-row-${infoKey}"]`);
+  }
+
+  getInfoPropertyKeyFromRow(infoKey: string) {
+    return this.getInfoRow(infoKey).find('[data-cy="info-property-key"]');
+  }
+
+  getInfoPropertyValueJsonFromRow(infoKey: string) {
+    return this.getInfoRow(infoKey).find(`[data-cy="info-property-value-json-${infoKey}"]`);
+  }
+
+  getInfoNoDataMessage() {
+    return cy.get('[data-cy="info-no-data-message"]');
+  }
+
+  getInfoDataNotAvailableMessage() {
+    return cy.get('[data-cy="info-data-not-available-message"]');
+  }
+
+  // --- Verification Methods (from previous, still valid) ---
+  verifyHealthStatus(expectedStatus: string) {
+    this.getHealthStatusText().should('contain.text', expectedStatus.toUpperCase());
+  }
+
+  verifyApplicationInfoIsPresent() {
+    this.getInfoTable().should('be.visible');
+    this.getInfoTable().find('tbody tr').should('have.length.greaterThan', 0);
+    // Example: Check for a common key (assuming 'git' is always present as per info.json)
+    this.getInfoRow('git').should('be.visible'); // More specific with data-cy
+  }
+
+  verifyOverviewDisplayIsVisible() {
+    this.getContainer().should('be.visible');
+  }
+}
