@@ -1,1 +1,212 @@
+import { Given, When, Then, And } from 'cypress-cucumber-preprocessor/steps';
+import { ActuatorMonitorPo } from '../../../pages/ActuatorMonitor.po';
+import { OverviewDisplayPo } from '../../../support/components/OverviewDisplay.po';
+import { ActuatorDisplayPo } from '../../../support/components/ActuatorDisplay.po';
+import { ActuatorEnvironmentTabEnum, ActuatorViewTabEnum } from '../../../support/enums/actuator-monitor.enum';
+
+const actuatorMonitorPo = new ActuatorMonitorPo();
+const overviewDisplayPo = new OverviewDisplayPo();
+const actuatorDisplayPo = new ActuatorDisplayPo();
+
+// Default environment for initial mocks
+const DEFAULT_ENV = 'dev';
+const E2E_ENV = 'e2e'; // Example for another environment
+
+/**
+ * Helper function to create a view name part for data-cy selectors.
+ * Converts "Scheduled Tasks" to "scheduledtasks".
+ * @param view The ActuatorViewTabEnum or string representation of the view.
+ * @returns A lowercase string with spaces removed.
+ */
+const toViewSelectorPart = (view: ActuatorViewTabEnum | string): string => {
+  return view.toString().toLowerCase().replace(/\s+/g, '');
+};
+
+Given('the user visits the Actuator Monitor page', () => {
+  cy.visit('/'); // Adjust if the component is on a specific route e.g. /actuator-monitor
+  actuatorMonitorPo.verifyActuatorMonitorIsVisible();
+});
+
+And('API endpoints are mocked', () => {
+  // Mock data for the default 'dev' environment
+  cy.intercept('GET', `**/actuator/health?env=${DEFAULT_ENV}`, { fixture: 'health.json' }).as('getDevHealth');
+  cy.intercept('GET', `**/actuator/info?env=${DEFAULT_ENV}`, { fixture: 'info.json' }).as('getDevInfo');
+  cy.intercept('GET', `**/actuator/env?env=${DEFAULT_ENV}`, { fixture: 'env.json' }).as('getDevEnv');
+  cy.intercept('GET', `**/actuator/caches?env=${DEFAULT_ENV}`, { fixture: 'caches.json' }).as('getDevCaches');
+
+  // Mock for 'e2e' environment (example success)
+  cy.intercept('GET', `**/actuator/health?env=${E2E_ENV}`, { statusCode: 200, body: { status: 'UP' } }).as('getE2EHealth');
+  cy.intercept('GET', `**/actuator/info?env=${E2E_ENV}`, { statusCode: 200, body: { app: {name: 'E2E App'} } }).as('getE2EInfo');
+  cy.intercept('GET', `**/actuator/env?env=${E2E_ENV}`, { fixture: 'env.json' }).as('getE2EEnv'); // Can use a different fixture if needed
+  cy.intercept('GET', `**/actuator/caches?env=${E2E_ENV}`, { fixture: 'caches.json' }).as('getE2ECaches'); // Can use a different fixture
+
+  // Example of mocking an error for a specific endpoint (if needed for a scenario)
+  // cy.intercept('GET', '**/actuator/health?env=prod', { statusCode: 500, body: { error: "Internal Server Error"} }).as('getProdHealthError');
+});
+
+Then('the "{word}" environment tab should be active', (envName: string) => {
+  const envKey = envName.toUpperCase() as keyof typeof ActuatorEnvironmentTabEnum;
+  const envEnumValue = ActuatorEnvironmentTabEnum[envKey];
+  if (!envEnumValue) {
+    throw new Error(`Unknown environment: ${envName}. Please check ActuatorEnvironmentTabEnum.`);
+  }
+  actuatorMonitorPo.getEnvironmentTab(envEnumValue)
+    .should('have.class', 'active')
+    .and('have.attr', 'aria-pressed', 'true');
+});
+
+Then('the "{word}" view tab should be active', (viewName: string) => {
+  const viewKey = viewName.toUpperCase().replace(/\s+/g, '_') as keyof typeof ActuatorViewTabEnum; // e.g., "SCHEDULED_TASKS"
+  const viewEnumValue = ActuatorViewTabEnum[viewKey];
+  if (!viewEnumValue) {
+    throw new Error(`Unknown view: ${viewName}. Please check ActuatorViewTabEnum.`);
+  }
+  actuatorMonitorPo.getViewTab(viewEnumValue) // Pass the enum value "Scheduled Tasks"
+    .should('have.class', 'active')
+    .and('have.attr', 'aria-pressed', 'true');
+});
+
+Then('the Overview section should display health status "{word}"', (expectedStatus: string) => {
+  cy.wait('@getDevHealth', { timeout: 10000 });
+  cy.wait('@getDevInfo', { timeout: 10000 });
+
+  overviewDisplayPo.verifyOverviewDisplayIsVisible();
+  // Check for errors first
+  overviewDisplayPo.getHealthErrorAlert().should('not.exist');
+  overviewDisplayPo.verifyHealthStatus(expectedStatus);
+});
+
+And('the Overview section should display application info', () => {
+  // Assumes health data has already been waited for in a preceding step if applicable
+  overviewDisplayPo.verifyOverviewDisplayIsVisible();
+  overviewDisplayPo.getInfoErrorAlert().should('not.exist');
+  overviewDisplayPo.verifyApplicationInfoIsPresent();
+});
+
+When('the user clicks on the "{word}" environment tab', (envName: string) => {
+  const envKey = envName.toUpperCase() as keyof typeof ActuatorEnvironmentTabEnum;
+  const envEnumValue = ActuatorEnvironmentTabEnum[envKey];
+  if (!envEnumValue) {
+    throw new Error(`Unknown environment: ${envName}.`);
+  }
+  actuatorMonitorPo.getEnvironmentTab(envEnumValue).click();
+});
+
+Then('data for "{word}" environment should be loading or displayed', (envName: string) => {
+  cy.get('body', { timeout: 10000 }).then($body => {
+    const $loadingContainer = $body.find('[data-cy="loading-container"]');
+    if ($loadingContainer.length > 0 && Cypress.dom.isVisible($loadingContainer)) {
+      actuatorMonitorPo.getLoadingContainer().find('.spinner').should('be.visible');
+      actuatorMonitorPo.getLoadingContainer().should('not.be.visible', { timeout: 15000 }); // Wait for loading to finish
+    } else {
+      actuatorMonitorPo.getContentArea().should('be.visible');
+    }
+  });
+
+  // Wait for the specific environment's primary calls to complete if aliases are set
+  const envLower = envName.toLowerCase();
+  if (envLower === DEFAULT_ENV) {
+    cy.wait(['@getDevHealth', '@getDevInfo'], { timeout: 10000 });
+  } else if (envLower === E2E_ENV) {
+    cy.wait(['@getE2EHealth', '@getE2EInfo'], { timeout: 10000 });
+  }
+  // Add more conditions if other environments are actively tested with specific aliases
+});
+
+Given('the "{word}" environment tab is active', (envName: string) => {
+  const envKey = envName.toUpperCase() as keyof typeof ActuatorEnvironmentTabEnum;
+  const envEnumValue = ActuatorEnvironmentTabEnum[envKey];
+  if (!envEnumValue) {
+    throw new Error(`Unknown environment: ${envName}.`);
+  }
+  actuatorMonitorPo.selectEnvironment(envEnumValue); // Uses the PO method for selection and verification
+});
+
+When('the user clicks on the "{word}" view tab', (viewName: string) => {
+  const viewKey = viewName.toUpperCase().replace(/\s+/g, '_') as keyof typeof ActuatorViewTabEnum;
+  const viewEnumValue = ActuatorViewTabEnum[viewKey];
+  if (!viewEnumValue) {
+    throw new Error(`Unknown view: ${viewName}.`);
+  }
+  actuatorMonitorPo.getViewTab(viewEnumValue).click();
+});
+
+Then('the Environment properties view should be displayed for "{word}"', (envName: string) => {
+  // envName is context from the Gherkin step, could be used to wait for specific env API if needed
+  const envLower = envName.toLowerCase();
+   if (envLower === DEFAULT_ENV) {
+    cy.wait('@getDevEnv', { timeout: 10000 });
+  } else if (envLower === E2E_ENV) {
+    cy.wait('@getE2EEnv', { timeout: 10000 });
+  }
+  actuatorDisplayPo.verifyActuatorDisplayIsVisible();
+  actuatorDisplayPo.getEnvView().should('be.visible');
+  // Check for generic error on this view first
+  actuatorMonitorPo.getViewErrorAlert(ActuatorViewTabEnum.ENV).should('not.exist');
+});
+
+Then('the Caches view should be displayed for "{word}"', (envName: string) => {
+  const envLower = envName.toLowerCase();
+  if (envLower === DEFAULT_ENV) {
+    cy.wait('@getDevCaches', { timeout: 10000 });
+  } else if (envLower === E2E_ENV) {
+    cy.wait('@getE2ECaches', { timeout: 10000 });
+  }
+  actuatorDisplayPo.verifyActuatorDisplayIsVisible();
+  actuatorDisplayPo.getCachesView().should('be.visible');
+  actuatorMonitorPo.getViewErrorAlert(ActuatorViewTabEnum.CACHES).should('not.exist');
+});
+
+When('the user clicks the refresh button', () => {
+  actuatorMonitorPo.getRefreshButton().click();
+});
+
+Then('data for "{word}" environment should be loading or re-loaded', (envName: string) => {
+  // This step implies an action (refresh) has just occurred.
+  // We expect loading to happen.
+  actuatorMonitorPo.getLoadingContainer().find('.spinner').should('be.visible');
+  actuatorMonitorPo.getLoadingContainer().should('not.be.visible', { timeout: 15000 });
+
+  const envLower = envName.toLowerCase();
+  if (envLower === DEFAULT_ENV) {
+    cy.wait(['@getDevHealth', '@getDevInfo', '@getDevEnv', '@getDevCaches'], { timeout: 10000 });
+  } else if (envLower === E2E_ENV) {
+    cy.wait(['@getE2EHealth', '@getE2EInfo', '@getE2EEnv', '@getE2ECaches'], { timeout: 10000 });
+  }
+  // Check that content area is visible after loading
+  actuatorMonitorPo.getContentArea().should('be.visible');
+});
+
+And('the refresh button icon should show a spinning animation and then stop', () => {
+  actuatorMonitorPo.getRefreshButton().find('i.fa-sync').should('have.class', 'fa-spin');
+  // The disappearance of fa-spin is tied to the isLoading$ observable becoming false.
+  // The previous step "data for ... should be loading or re-loaded" already waits for loading to complete.
+  // So, by the time this step runs, the spinner should ideally be gone.
+  actuatorMonitorPo.getRefreshButton().find('i.fa-sync').should('not.have.class', 'fa-spin', { timeout: 10000 });
+});
+
+Then('the Environment properties view should list properties from "env.json"', () => {
+  // Assumes this is for the DEFAULT_ENV ('dev') as per fixture name
+  cy.wait('@getDevEnv', { timeout: 10000 });
+  actuatorDisplayPo.verifyActuatorDisplayIsVisible();
+  actuatorDisplayPo.getEnvSummaryPropertiesTable().should('be.visible').within(() => {
+    // Check a few specific properties from your env.json data
+    [span_0](start_span)actuatorDisplayPo.verifyEnvPropertyExistsInSummary('local.server.port', '9011'); //[span_0](end_span)
+    actuatorDisplayPo.verifyEnvPropertyExistsInSummary('java.specification.version', '21'); [span_1](start_span)//[span_1](end_span)
+    // Add more specific checks if needed
+  });
+  // Also check that no "no data" message is shown for this view
+  actuatorMonitorPo.getNoDataForViewMessage(ActuatorViewTabEnum.ENV).should('not.exist');
+});
+
+Then('the Caches view should list cache names like "{word}" and "{word}"', (cache1: string, cache2: string) => {
+  // Assumes this is for the DEFAULT_ENV ('dev')
+  cy.wait('@getDevCaches', { timeout: 10000 });
+  actuatorDisplayPo.verifyActuatorDisplayIsVisible();
+  actuatorDisplayPo.getCachesTable().should('be.visible').within(() => {
+    [span_2](start_span)actuatorDisplayPo.verifyCacheExistsInTable(cache1); // e.g., "SafeAgent"[span_2](end_span)
+    actuatorDisplayPo.verifyCacheExistsInTable(cache2); [span_3](start_span)// e.g., "IsStockExchange"[span_3](end_span)
+  });
+  actuatorMonitorPo.getNoDataForViewMessage(ActuatorViewTabEnum.CACHES).should('not.exist');
+});
 
