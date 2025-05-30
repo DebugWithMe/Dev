@@ -1,0 +1,53 @@
+import { ActuatorEnvironmentTabEnum, ActuatorViewTabEnum } from '../support/enums/actuator-monitor.enum'; // Adjusted path
+
+export class ActuatorMonitorPo { // Renamed class
+  private readonly containerSelector = 'app-actuator-monitor .actuator-container';
+  private readonly envTabsSelector = '.env-tabs .tab-btn';
+  private readonly viewTabsSelector = '.endpoint-tabs .sub-tab-btn';
+  private readonly refreshButtonSelector = '.env-tabs-container .refresh-btn';
+  private readonly loadingSpinnerSelector = '.loading-container .spinner';
+  private readonly activeEnvTabSelector = `${this.envTabsSelector}.active`;
+  private readonly activeViewTabSelector = `${this.viewTabsSelector}.active`;
+  private readonly contentAreaSelector = '.content-area';
+
+  getEnvironmentTab(env: ActuatorEnvironmentTabEnum | string) {
+    return cy.contains(this.envTabsSelector, env.toString().toUpperCase());
+  }
+
+  getViewTab(view: ActuatorViewTabEnum | string) {
+    return cy.contains(this.viewTabsSelector, view.toString(), { matchCase: false });
+  }
+
+  getRefreshButton() {
+    return cy.get(this.refreshButtonSelector);
+  }
+
+  getLoadingSpinner() {
+    return cy.get(this.loadingSpinnerSelector);
+  }
+  getActiveEnvironmentTab() {
+    return cy.get(this.activeEnvTabSelector);
+  }
+
+  getActiveViewTab() {
+    return cy.get(this.activeViewTabSelector);
+  }
+
+  getContentArea() {
+    return cy.get(this.contentAreaSelector);
+  }
+
+  verifyActuatorMonitorIsVisible() {
+    cy.get(this.containerSelector).should('be.visible');
+  }
+
+  selectEnvironment(env: ActuatorEnvironmentTabEnum) {
+    this.getEnvironmentTab(env).click();
+    this.getActiveEnvironmentTab().should('contain.text', env.toString().toUpperCase());
+  }
+
+  selectView(view: ActuatorViewTabEnum) {
+    this.getViewTab(view).click();
+    this.getActiveViewTab().should('contain.text', view.toString());
+  }
+}
