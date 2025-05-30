@@ -1,0 +1,26 @@
+// This entire block should be UNCOMMENTED and active in your .steps.ts file
+Then('the Environment properties view should list properties from "env.json"', () => {
+  // Assumes this is for the DEFAULT_ENV ('dev') as per fixture name
+  cy.wait('@getDevEnv', { timeout: 10000 });
+  actuatorDisplayPo.verifyActuatorDisplayIsVisible();
+  actuatorDisplayPo.getEnvSummaryPropertiesTable().should('be.visible').within(() => {
+    // Check a few specific properties from your env.json data
+    actuatorDisplayPo.verifyEnvPropertyExistsInSummary('local.server.port', '9011');
+    actuatorDisplayPo.verifyEnvPropertyExistsInSummary('java.specification.version', '21');
+    // Add more specific checks if needed
+  });
+  // Also check that no "no data" message is shown for this view
+  actuatorMonitorPo.getNoDataForViewMessage(ActuatorViewTabEnum.ENV).should('not.exist');
+});
+
+// This entire block should also be UNCOMMENTED and active in your .steps.ts file
+Then('the Caches view should list cache names like "{word}" and "{word}"', (cache1: string, cache2: string) => {
+  // Assumes this is for the DEFAULT_ENV ('dev')
+  cy.wait('@getDevCaches', { timeout: 10000 });
+  actuatorDisplayPo.verifyActuatorDisplayIsVisible();
+  actuatorDisplayPo.getCachesTable().should('be.visible').within(() => {
+    actuatorDisplayPo.verifyCacheExistsInTable(cache1); // e.g., "SafeAgent"
+    actuatorDisplayPo.verifyCacheExistsInTable(cache2); // e.g., "IsStockExchange"
+  });
+  actuatorMonitorPo.getNoDataForViewMessage(ActuatorViewTabEnum.CACHES).should('not.exist');
+});
